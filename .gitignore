@@ -1,0 +1,24 @@
+# Distribution / packaging
+build/
+*.egg-info/
+
+# Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Visual Studio Code
+.vscode/
+
+# Ruff stuff:
+.ruff_cache/
