@@ -13,11 +13,14 @@ from typing import Dict, List, Optional, Tuple
 import requests
 import urllib3
 from irods.session import iRODSSession
+from webdav3.client import Client
 
 # Configuration for Yoda.
 IRODS_HOST = 'portal.yoda.test'
 IRODS_PORT = 1247
 IRODS_ZONE = 'tempZone'
+PORTAL_FQDN = f"https://{IRODS_HOST}"
+WEBDAV_FQDN = "https://data.yoda.test"
 
 IRODS_SESSION_OPTIONS = {
     "irods_client_server_policy": "CS_NEG_REQUIRE",
@@ -102,7 +105,7 @@ def portal_login(user: Dict[str, str], verbose: bool) -> Optional[Tuple[str, str
     # Disable insecure connection warning.
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    url = f"https://{IRODS_HOST}/user/login"
+    url = f"{PORTAL_FQDN}/user/login"
     if verbose:
         logger.info(f"Login for user {username} (retrieve CSRF token)")
 
@@ -112,13 +115,13 @@ def portal_login(user: Dict[str, str], verbose: bool) -> Optional[Tuple[str, str
             content = client.get(url, verify=False).content.decode()
             found_csrf_tokens = CSRF_TOKEN_PATTERN.findall(content)
             if not found_csrf_tokens:
-                logger.error(f"Could not find login CSRF token in response for user {username}. Response was: {content}")
+                logger.error(f"Portal: could not find login CSRF token for user {username}. Response was: {content}")
                 return None
             csrf = found_csrf_tokens[0]
 
             # Login as user.
             if verbose:
-                logger.info(f"Login for user {username} (main login)")
+                logger.info(f"Portal: login for user {username} (main login)")
 
             login_data = {'csrf_token': csrf, 'username': username, 'password': password, 'next': '/'}
             response = client.post(url, data=login_data, headers={'Referer': url}, verify=False)
@@ -126,24 +129,45 @@ def portal_login(user: Dict[str, str], verbose: bool) -> Optional[Tuple[str, str
             # Check for successful login by looking for session cookie.
             session_cookie = client.cookies.get('__Host-session')
             if not session_cookie:
-                logger.error(f"Login failed for user {username}. No session cookie found.")
+                logger.error(f"Portal: login failed for user {username}. No session cookie found.")
                 return None
 
             # Retrieve the authenticated CSRF token.
             content = response.content.decode()
             found_csrf_tokens = CSRF_TOKEN_PATTERN.findall(content)
             if not found_csrf_tokens:
-                logger.error(f"Could not find CSRF token in response for user {username}. Response was: {content}")
+                logger.error(f"Portal: could not find CSRF token for user {username}. Response was: {content}")
                 return None
             csrf = found_csrf_tokens[0]
 
             if verbose:
-                logger.info(f"Login for user {username} completed.")
+                logger.info(f"Portal: login for user {username} completed.")
             return csrf, session_cookie
 
         except Exception as e:
-            logger.error(f"Error during portal login for user {username}: {e}")
+            logger.error(f"Portal: error during portal login for user {username}: {e}")
             return None
+
+
+def webdav_login(user: Dict[str, str], verbose: bool) -> Optional[Dict[str, str]]:
+    """Start session with WebDAV."""
+    try:
+        options = {
+            'webdav_hostname': WEBDAV_FQDN,
+            'webdav_login': user['username'],
+            'webdav_password': user['password'],
+        }
+
+        client = Client(options)
+        client.verify = False
+        client.check("/")
+
+        if verbose:
+            logger.info(f"WebDAV: user {user['username']} logged in successfully")
+        return user
+    except Exception as e:
+        logger.error(f"WebDAV: failed to log in user {user['username']}: {e}")
+        return None
 
 
 def main() -> None:
@@ -153,6 +177,7 @@ def main() -> None:
 
     irods_sessions = []   # List to store iRODS sessions.
     portal_sessions = []  # List to store portal sessions.
+    webdav_sessions = []  # List to store WebDAV sessions.
 
     def manage_session(action: str, user: Dict[str, str], session_list: List, session_type: str) -> None:
         """Manage session login or logout."""
@@ -160,8 +185,10 @@ def main() -> None:
             if action == 'login':
                 if session_type == 'irods':
                     session = irods_login(user, verbose)
-                else:
+                elif session_type == 'portal':
                     session = portal_login(user, verbose)
+                elif session_type == 'webdav':
+                    session = webdav_login(user, verbose)
                 if session:
                     session_list.append(session)
             elif action == 'logout':
@@ -172,8 +199,8 @@ def main() -> None:
 
     # Start sessions
     with ThreadPoolExecutor(max_workers=args.concurrent_sessions) as executor:
+        # iRODS login.
         start_time = time.time()
-        # iRODS login
         futures = {executor.submit(manage_session, 'login', users[i % len(users)], irods_sessions, 'irods'):
                    i for i in range(args.sessions)}
         for future in as_completed(futures):
@@ -182,14 +209,13 @@ def main() -> None:
         total_time = time.time() - start_time
         logger.info(f"iRODS: {args.sessions} sessions (concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
 
-        # iRODS logout
-        start_time = time.time()
+        # iRODS logout.
         futures = {executor.submit(manage_session, 'logout', session, irods_sessions, 'irods'):
                    session for session in irods_sessions}
         for future in as_completed(futures):
             future.result()
 
-        # Portal login
+        # Portal login.
         start_time = time.time()
         futures = {executor.submit(manage_session, 'login', users[i % len(users)], portal_sessions, 'portal'):
                    i for i in range(args.sessions)}
@@ -198,6 +224,16 @@ def main() -> None:
 
         total_time = time.time() - start_time
         logger.info(f"Portal: {args.sessions} sessions (concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
+
+        # Webdav login.
+        start_time = time.time()
+        futures = {executor.submit(manage_session, 'login', users[i % len(users)], webdav_sessions, 'webdav'):
+                   i for i in range(args.sessions)}
+        for future in as_completed(futures):
+            future.result()
+
+        total_time = time.time() - start_time
+        logger.info(f"WebDAV: {args.sessions} sessions (concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
 
 
 if __name__ == "__main__":

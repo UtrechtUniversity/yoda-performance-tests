@@ -2,12 +2,13 @@ from setuptools import setup
 
 setup(
     name='yoda_performance_tests',
-    version='0.1',
+    version='0.2',
     py_modules=['main'],
     install_requires=[
         'python-irodsclient==3.1.1',
         'urllib3==2.5.0',
         'requests==2.32.4',
+        'webdavclient3',
     ],
     entry_points={
         'console_scripts': [
