@@ -9,6 +9,7 @@ setup(
         'urllib3==2.5.0',
         'requests==2.32.4',
         'webdavclient3',
+        'matplotlib==3.10.3',
     ],
     entry_points={
         'console_scripts': [

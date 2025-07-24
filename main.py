@@ -12,6 +12,8 @@ import time
 from concurrent.futures import as_completed, ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 
+import matplotlib.pyplot as plt
+import numpy as np
 import requests
 import urllib3
 from irods.session import iRODSSession
@@ -74,6 +76,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-k", "--insecure", action="store_true", default=False,
         help="Disables SSL certificate verification"
+    )
+    parser.add_argument(
+        "-g", "--graph", action="store_true", default=False,
+        help="Fenerate graph of performance test results"
     )
     return parser.parse_args()
 
@@ -227,6 +233,35 @@ def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         return None
 
 
+def plot_results_graph(results: Dict, concurrent_sessions: int) -> None:
+    # Prepare results for plotting.
+    labels = list(results.keys())
+
+    irods_values = [results[key]['irods'] for key in labels]
+    portal_values = [results[key]['portal'] for key in labels]
+    webdav_values = [results[key]['webdav'] for key in labels]
+
+    x = np.arange(len(labels))
+    width = 0.25
+
+    # Create the bar graph.
+    fig, ax = plt.subplots()
+    ax.bar(x - width, irods_values, width, label='iRODS')
+    ax.bar(x, portal_values, width, label='Portal')
+    ax.bar(x + width, webdav_values, width, label='WebDAV')
+
+    # Add labels.
+    ax.set_xlabel('Sessions')
+    ax.set_ylabel('Time (s)')
+    ax.set_title(f'Yoda login performance (concurrent sessions: {concurrent_sessions})')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    # Save the figure.
+    plt.savefig('yoda_login_performance.png')
+
+
 def main() -> None:
     """Main function to manage sessions with specified number of concurrent threads."""
     args = parse_args()
@@ -255,9 +290,10 @@ def main() -> None:
 
     # Start sessions
     for sessions in args.sessions:
-        irods_sessions = []   # List to store iRODS sessions.
-        portal_sessions = []  # List to store portal sessions.
-        webdav_sessions = []  # List to store WebDAV sessions.
+        irods_sessions = []     # List to store iRODS sessions.
+        portal_sessions = []    # List to store portal sessions.
+        webdav_sessions = []    # List to store WebDAV sessions.
+        results[sessions] = {}  # Dict to store test results for this session.
 
         with ThreadPoolExecutor(max_workers=args.concurrent_sessions) as executor:
             # iRODS login.
@@ -270,7 +306,7 @@ def main() -> None:
             total_time = time.time() - start_time
             logger.info(f"iRODS: {len(irods_sessions)}/{sessions} sessions "
                         f"(concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
-            results[sessions] = {"irods": total_time}
+            results[sessions]["irods"] = total_time
 
             # iRODS logout.
             futures = {executor.submit(manage_session, 'logout', session, irods_sessions, 'irods'):
@@ -288,7 +324,7 @@ def main() -> None:
             total_time = time.time() - start_time
             logger.info(f"Portal: {len(portal_sessions)}/{sessions} sessions "
                         f"(concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
-            results[sessions] = {"portal": total_time}
+            results[sessions]["portal"] = total_time
 
             # Retrieve Data Access Passwords for WebDAV login.
             for user in users:
@@ -306,7 +342,10 @@ def main() -> None:
             total_time = time.time() - start_time
             logger.info(f"WebDAV: {len(webdav_sessions)}/{sessions} sessions "
                         f"(concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
-            results[sessions] = {"webdav": total_time}
+            results[sessions]["webdav"] = total_time
+
+    if args.graph:
+        plot_results_graph(results, args.concurrent_sessions)
 
 
 if __name__ == "__main__":
