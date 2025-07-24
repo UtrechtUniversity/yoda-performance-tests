@@ -4,6 +4,8 @@ __copyright__ = 'Copyright (c) 2025, Utrecht University'
 __license__   = 'GPLv3, see LICENSE'
 
 import argparse
+import datetime
+import json
 import logging
 import re
 import time
@@ -91,11 +93,11 @@ def irods_login(user: Dict[str, str], verbose: bool) -> Optional[iRODSSession]:
             _ = session.server_version  # Implicitly creates connections
 
         if verbose:
-            logger.info(f"iRDOS: user {user['username']} logged in successfully")
+            logger.info(f"iRDOS: user <{user['username']}> logged in successfully")
         return session
     except Exception as e:
         if verbose:
-            logger.error(f"iRDOS: failed to log in user {user['username']}: {e}")
+            logger.error(f"iRDOS: failed to log in user <{user['username']}>: {e}")
         return None
 
 
@@ -110,7 +112,7 @@ def irods_logout(session: iRODSSession, verbose: bool) -> None:
             logger.error(f"iRDOS: failed to log out user: {e}")
 
 
-def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optional[Tuple[str, str]]:
+def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optional[Tuple[str, str, str]]:
     """Start session with Yoda portal."""
     username = user['username']
     password = user['password']
@@ -121,7 +123,7 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
 
     url = f"{PORTAL_FQDN}/user/login"
     if verbose:
-        logger.info(f"Portal: retrieve CSRF token for user {username}")
+        logger.info(f"Portal: retrieve CSRF token for user <{username}>")
 
     with requests.Session() as client:
         # Retrieve the login CSRF token.
@@ -130,13 +132,13 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
             found_csrf_tokens = CSRF_TOKEN_PATTERN.findall(content)
             if not found_csrf_tokens:
                 if verbose:
-                    logger.error(f"Portal: could not find login CSRF token for user {username}. Response was: {content}")
+                    logger.error(f"Portal: could not find login CSRF token for user <{username}>. Response was: {content}")
                 return None
             csrf = found_csrf_tokens[0]
 
             # Login as user.
             if verbose:
-                logger.info(f"Portal: login for user {username} (main login)")
+                logger.info(f"Portal: login for user <{username}>")
 
             login_data = {'csrf_token': csrf, 'username': username, 'password': password, 'next': '/'}
             response = client.post(url, data=login_data, headers={'Referer': url}, verify=not insecure)
@@ -145,7 +147,7 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
             session_cookie = client.cookies.get('__Host-session')
             if not session_cookie:
                 if verbose:
-                    logger.error(f"Portal: login failed for user {username}. No session cookie found.")
+                    logger.error(f"Portal: login failed for user <{username}>, no session cookie found")
                 return None
 
             # Retrieve the authenticated CSRF token.
@@ -153,18 +155,54 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
             found_csrf_tokens = CSRF_TOKEN_PATTERN.findall(content)
             if not found_csrf_tokens:
                 if verbose:
-                    logger.error(f"Portal: could not find CSRF token for user {username}. Response was: {content}")
+                    logger.error(f"Portal: could not find CSRF token for user <{username}>, response was: {content}")
                 return None
             csrf = found_csrf_tokens[0]
 
             if verbose:
-                logger.info(f"Portal: login for user {username} completed.")
-            return csrf, session_cookie
+                logger.info(f"Portal: retrieve login CSRF token for user <{username}>")
+            return username, csrf, session_cookie
 
         except Exception as e:
             if verbose:
-                logger.error(f"Portal: error during portal login for user {username}: {e}")
+                logger.error(f"Portal: error during portal login for user <{username}>: {e}")
             return None
+
+
+def api_request(user: Tuple[str, str, str],
+                request: str, data: Dict[str, str],
+                verbose: bool, insecure: bool) -> Tuple[int, Dict[str, str]]:
+    # Retrieve user cookies.
+    username, csrf, session = user
+
+    if insecure:
+        # Disable insecure connection warning.
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    # Make API request.
+    url = PORTAL_FQDN + "/api/" + request
+    files = {'csrf_token': (None, csrf), 'data': (None, json.dumps(data))}
+    cookies = {'__Host-session': session}
+    headers = {'referer': PORTAL_FQDN}
+    if verbose:
+        logger.info(f"API: processing request <{request}> for user <{username}> with data <{data}>")
+    response = requests.post(url, headers=headers, files=files, cookies=cookies, verify=not insecure, timeout=60)
+
+    # Remove debug info from response body.
+    body = response.json()
+
+    return response.status_code, body
+
+
+def get_data_access_password(user: Tuple[str, str, str], verbose: bool, insecure: bool) -> str:
+    # Get the current timestamp
+    timestamp = datetime.datetime.now()
+    nice_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    label = f"Yoda Performance Test {nice_timestamp}"
+    status, body = api_request(
+        user, "token_generate", {"label": label}, verbose, insecure
+    )
+    return body['data']
 
 
 def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optional[Dict[str, str]]:
@@ -173,7 +211,7 @@ def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         options = {
             'webdav_hostname': WEBDAV_FQDN,
             'webdav_login': user['username'],
-            'webdav_password': user['password'],
+            'webdav_password': user['data_access_password'],
         }
 
         client = Client(options)
@@ -181,11 +219,11 @@ def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         client.check("/")
 
         if verbose:
-            logger.info(f"WebDAV: user {user['username']} logged in successfully")
+            logger.info(f"WebDAV: user <{user['username']}> logged in successfully")
         return user
     except Exception as e:
         if verbose:
-            logger.error(f"WebDAV: failed to log in user {user['username']}: {e}")
+            logger.error(f"WebDAV: failed to log in user <{user['username']}>: {e}")
         return None
 
 
@@ -252,7 +290,13 @@ def main() -> None:
                         f"(concurrency: {args.concurrent_sessions}) in {total_time:.2f} seconds")
             results[sessions] = {"portal": total_time}
 
-            # Webdav login.
+            # Retrieve Data Access Passwords for WebDAV login.
+            for user in users:
+                portal_session = next((session for session in portal_sessions if session[0] == user['username']), None)
+                if portal_session:
+                    user['data_access_password'] = get_data_access_password(portal_session, verbose, insecure)
+
+            # WebDAV login.
             start_time = time.time()
             futures = {executor.submit(manage_session, 'login', users[i % len(users)], webdav_sessions, 'webdav'):
                        i for i in range(sessions)}
