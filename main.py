@@ -7,6 +7,7 @@ import argparse
 import datetime
 import json
 import logging
+import os
 import re
 import time
 from concurrent.futures import as_completed, ThreadPoolExecutor
@@ -37,18 +38,6 @@ IRODS_SESSION_OPTIONS = {
     'application_name': 'yoda-performance-tests'
 }
 
-# List of users and their passwords.
-users = [
-    {'username': 'researcher', 'password': 'test'},
-    {'username': 'viewer', 'password': 'test'},
-    {'username': 'groupmanager', 'password': 'test'},
-    {'username': 'datamanager', 'password': 'test'},
-    {'username': 'functionaladmingroup', 'password': 'test'},
-    {'username': 'functionaladmincategory', 'password': 'test'},
-    {'username': 'functionaladminpriv', 'password': 'test'},
-    {'username': 'technicaladmin', 'password': 'test'},
-]
-
 # Configure logging
 LOGGING_FORMAT = "%(asctime)s %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOGGING_FORMAT)
@@ -63,11 +52,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "-s", "--sessions", nargs='+', type=int, default=10,
-        help="Number of sessions to open in total (default: 10)"
+        help="Number of sessions to open in total (default: %(default)s)"
     )
     parser.add_argument(
         "-c", "--concurrent-sessions", type=int, default=2,
-        help="Specify the number of concurrent sessions to run (default: 2)"
+        help="Specify the number of concurrent sessions to run (default: %(default)s)"
+    )
+    parser.add_argument(
+        "-u", "--users", type=str, default="users.json",
+        help="Path to the JSON file containing user credentials (default: %(default)s)"
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", default=False,
@@ -79,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-g", "--graph", action="store_true", default=False,
-        help="Fenerate graph of performance test results"
+        help="Generate graph of performance test results"
     )
     return parser.parse_args()
 
@@ -233,6 +226,17 @@ def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         return None
 
 
+def load_users_from_json(file_path: str) -> List[Dict[str, str]]:
+    """Load users from a JSON file."""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError
+
+    with open(file_path, 'r') as file:
+        users = json.load(file)
+
+    return users
+
+
 def plot_results_graph(results: Dict, concurrent_sessions: int) -> None:
     # Prepare results for plotting.
     labels = list(results.keys())
@@ -268,6 +272,13 @@ def main() -> None:
     verbose = args.verbose
     insecure = args.insecure
     results = {}
+
+    # Load users from JSON file.
+    try:
+        users = load_users_from_json(args.users)
+    except FileNotFoundError:
+        logger.error(f"ERROR: Users file not found: {args.users}")
+        return None
 
     def manage_session(action: str, user: Dict[str, str], session_list: List, session_type: str) -> None:
         """Manage session login or logout."""

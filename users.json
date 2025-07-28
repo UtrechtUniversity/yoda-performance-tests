@@ -1,0 +1,10 @@
+[
+    {"username": "researcher", "password": "test"},
+    {"username": "viewer", "password": "test"},
+    {"username": "groupmanager", "password": "test"},
+    {"username": "datamanager", "password": "test"},
+    {"username": "functionaladmingroup", "password": "test"},
+    {"username": "functionaladmincategory", "password": "test"},
+    {"username": "functionaladminpriv", "password": "test"},
+    {"username": "technicaladmin", "password": "test"}
+]
