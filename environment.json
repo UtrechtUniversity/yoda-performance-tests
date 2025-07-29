@@ -1,0 +1,13 @@
+{
+    "irods": {
+        "host": "portal.yoda.test",
+        "port": 1247,
+        "zone": "tempZone"
+    },
+    "portal": {
+        "fqdn": "https://portal.yoda.test"
+    },
+    "webdav": {
+        "fqdn": "https://data.yoda.test"
+    }
+}

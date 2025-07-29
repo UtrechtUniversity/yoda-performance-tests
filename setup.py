@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='yoda_performance_tests',
-    version='0.2',
+    version='0.3',
     py_modules=['main'],
     install_requires=[
         'python-irodsclient==3.1.1',

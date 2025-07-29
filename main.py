@@ -20,13 +20,7 @@ import urllib3
 from irods.session import iRODSSession
 from webdav3.client import Client
 
-# Configuration for Yoda.
-IRODS_HOST = 'portal.yoda.test'
-IRODS_PORT = 1247
-IRODS_ZONE = 'tempZone'
-PORTAL_FQDN = f"https://{IRODS_HOST}"
-WEBDAV_FQDN = "https://data.yoda.test"
-
+# Configuration for iRODS.
 IRODS_SESSION_OPTIONS = {
     "irods_client_server_policy": "CS_NEG_REQUIRE",
     "irods_client_server_negotiation": "request_server_negotiation",
@@ -59,6 +53,10 @@ def parse_args() -> argparse.Namespace:
         help="Specify the number of concurrent sessions to run (default: %(default)s)"
     )
     parser.add_argument(
+        "-e", "--environment", type=str, default="environment.json",
+        help="Path to the JSON file containing Yoda environemnt configuration (default: %(default)s)"
+    )
+    parser.add_argument(
         "-u", "--users", type=str, default="users.json",
         help="Path to the JSON file containing user credentials (default: %(default)s)"
     )
@@ -77,15 +75,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def irods_login(user: Dict[str, str], verbose: bool) -> Optional[iRODSSession]:
+def irods_login(user: Dict[str, str], config: Dict, verbose: bool) -> Optional[iRODSSession]:
     """Start session with iRODS."""
     try:
         with iRODSSession(
-            host=IRODS_HOST,
-            port=IRODS_PORT,
+            host=config['irods']['host'],
+            port=config['irods']['port'],
             user=user['username'],
             password=user['password'],
-            zone=IRODS_ZONE,
+            zone=config['irods']['zone'],
             configure=True,
             **IRODS_SESSION_OPTIONS
         ) as session:
@@ -111,7 +109,9 @@ def irods_logout(session: iRODSSession, verbose: bool) -> None:
             logger.error(f"iRDOS: failed to log out user: {e}")
 
 
-def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optional[Tuple[str, str, str]]:
+def portal_login(user: Dict[str, str],
+                 config: Dict,
+                 verbose: bool, insecure: bool) -> Optional[Tuple[str, str, str]]:
     """Start session with Yoda portal."""
     username = user['username']
     password = user['password']
@@ -120,7 +120,7 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         # Disable insecure connection warning.
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-    url = f"{PORTAL_FQDN}/user/login"
+    url = f"{config['portal']['fqdn']}/user/login"
     if verbose:
         logger.info(f"Portal: retrieve CSRF token for user <{username}>")
 
@@ -170,6 +170,7 @@ def portal_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
 
 def api_request(user: Tuple[str, str, str],
                 request: str, data: Dict[str, str],
+                config: Dict,
                 verbose: bool, insecure: bool) -> Tuple[int, Dict[str, str]]:
     # Retrieve user cookies.
     username, csrf, session = user
@@ -179,10 +180,10 @@ def api_request(user: Tuple[str, str, str],
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     # Make API request.
-    url = PORTAL_FQDN + "/api/" + request
+    url = f"{config['portal']['fqdn']}/api/{request}"
     files = {'csrf_token': (None, csrf), 'data': (None, json.dumps(data))}
     cookies = {'__Host-session': session}
-    headers = {'referer': PORTAL_FQDN}
+    headers = {'referer': config['portal']['fqdn']}
     if verbose:
         logger.info(f"API: processing request <{request}> for user <{username}> with data <{data}>")
     response = requests.post(url, headers=headers, files=files, cookies=cookies, verify=not insecure, timeout=60)
@@ -193,22 +194,24 @@ def api_request(user: Tuple[str, str, str],
     return response.status_code, body
 
 
-def get_data_access_password(user: Tuple[str, str, str], verbose: bool, insecure: bool) -> str:
+def get_data_access_password(user: Tuple[str, str, str],
+                             config: Dict,
+                             verbose: bool, insecure: bool) -> str:
     # Get the current timestamp
     timestamp = datetime.datetime.now()
     nice_timestamp = timestamp.strftime("%Y-%m-%d %H:%M:%S")
     label = f"Yoda Performance Test {nice_timestamp}"
     status, body = api_request(
-        user, "token_generate", {"label": label}, verbose, insecure
+        user, "token_generate", {"label": label}, config, verbose, insecure
     )
     return body['data']
 
 
-def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optional[Dict[str, str]]:
+def webdav_login(user: Dict[str, str], config: Dict, verbose: bool, insecure: bool) -> Optional[Dict[str, str]]:
     """Start session with WebDAV."""
     try:
         options = {
-            'webdav_hostname': WEBDAV_FQDN,
+            'webdav_hostname': config['webdav']['fqdn'],
             'webdav_login': user['username'],
             'webdav_password': user['data_access_password'],
         }
@@ -226,15 +229,14 @@ def webdav_login(user: Dict[str, str], verbose: bool, insecure: bool) -> Optiona
         return None
 
 
-def load_users_from_json(file_path: str) -> List[Dict[str, str]]:
-    """Load users from a JSON file."""
+def load_config(file_path: str) -> Dict:
     if not os.path.exists(file_path):
         raise FileNotFoundError
 
     with open(file_path, 'r') as file:
-        users = json.load(file)
+        config = json.load(file)
 
-    return users
+    return config
 
 
 def plot_results_graph(results: Dict, concurrent_sessions: int) -> None:
@@ -273,9 +275,16 @@ def main() -> None:
     insecure = args.insecure
     results = {}
 
+    # Load environment config from JSON file.
+    try:
+        config = load_config(args.environment)
+    except FileNotFoundError:
+        logger.error(f"ERROR: Config file not found: {args.environment}")
+        return None
+
     # Load users from JSON file.
     try:
-        users = load_users_from_json(args.users)
+        users = load_config(args.users)
     except FileNotFoundError:
         logger.error(f"ERROR: Users file not found: {args.users}")
         return None
@@ -285,11 +294,11 @@ def main() -> None:
         try:
             if action == 'login':
                 if session_type == 'irods':
-                    session = irods_login(user, verbose)
+                    session = irods_login(user, config, verbose)
                 elif session_type == 'portal':
-                    session = portal_login(user, verbose, insecure)
+                    session = portal_login(user, config, verbose, insecure)
                 elif session_type == 'webdav':
-                    session = webdav_login(user, verbose, insecure)
+                    session = webdav_login(user, config, verbose, insecure)
                 if session:
                     session_list.append(session)
             elif action == 'logout':
@@ -341,7 +350,7 @@ def main() -> None:
             for user in users:
                 portal_session = next((session for session in portal_sessions if session[0] == user['username']), None)
                 if portal_session:
-                    user['data_access_password'] = get_data_access_password(portal_session, verbose, insecure)
+                    user['data_access_password'] = get_data_access_password(portal_session, config, verbose, insecure)
 
             # WebDAV login.
             start_time = time.time()
