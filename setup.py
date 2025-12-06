@@ -6,7 +6,7 @@ setup(
     py_modules=['main'],
     install_requires=[
         'python-irodsclient==3.1.1',
-        'urllib3==2.5.0',
+        'urllib3==2.6.0',
         'requests==2.32.4',
         'webdavclient3',
         'matplotlib==3.10.3',
