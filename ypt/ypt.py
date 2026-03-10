@@ -29,7 +29,8 @@ IRODS_SESSION_OPTIONS = {
     "irods_encryption_num_hash_rounds": 16,
     "irods_encryption_algorithm": "AES-256-CBC",
     'authentication_scheme': "pam_password",
-    'application_name': 'yoda-performance-tests'
+    'application_name': 'yoda-performance-tests',
+    'irods_ssl_verify_server': 'None'
 }
 
 # Configure logging

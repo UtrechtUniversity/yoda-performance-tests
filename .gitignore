@@ -1,6 +1,7 @@
 # Distribution / packaging
 build/
 *.egg-info/
+**/.idea/*
 
 # Environments
 .env

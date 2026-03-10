@@ -1,13 +1,24 @@
 {
     "irods": {
-        "host": "portal.yoda.test",
-        "port": 1247,
-        "zone": "tempZone"
+        "host": "localhost",
+        "port": 8247,
+        "zone": "tempZone",
+        "session-options": {
+            "irods_client_server_policy": "CS_NEG_REQUIRE",
+            "irods_client_server_negotiation": "request_server_negotiation",
+            "irods_encryption_key_size": 32,
+            "irods_encryption_salt_size": 8,
+            "irods_encryption_num_hash_rounds": 16,
+            "irods_encryption_algorithm": "AES-256-CBC",
+            "authentication_scheme": "pam_password",
+            "application_name": "yoda-performance-tests",
+            "irods_ssl_verify_server": "None"
+        }
     },
     "portal": {
-        "fqdn": "https://portal.yoda.test"
+        "fqdn": "https://portal.yoda:8443"
     },
     "webdav": {
-        "fqdn": "https://data.yoda.test"
+        "fqdn": "https://data.yoda:8445"
     }
 }

@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ypt"
+version = "0.1.0"
+description = "Yoda Performance Testing (ypt) suite"
+readme = "README.md"
+requires-python = ">=3.12"
+
+license = {text = "GPL-3.0-or-later"}
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+dependencies = [
+    "python-irodsclient==3.1.1",
+    "locust==2.43.3",
+    "urllib3==2.6.0",
+    "requests==2.32.4",
+    "webdavclient3==3.14.7",
+    "matplotlib==3.10.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.2",
+    "ruff==0.15.4",
+    "mypy==1.19.1",
+]
+
+[tool.setuptools]
+packages = ["ypt"]
+
+
+[project.scripts]
+yoda-performance-tests = "ypt.ypt:main"
+
+[tool.ruff]
+target-version = "py312"
+
+select = [
+    "E", "W", "F", "C90", "D", "I", "N", "UP", "YTT", "BLE", "RUF", "PLE", "FURB", "SIM", "B"
+]
+
+extend-select = ["C4", "ISC", "T20"]
+
+ignore = ["D104", "D105", "D107", "D203", "D212", "E501"]
+
+line-length = 88
+fix = true
+
+per-file-ignores = { "__init__.py" = ["F401"] }
+
+exclude = [
+    ".idea",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".venv",
+    "venv",
+    ".mypy_cache",
+    ".ruff_cache",
+]
+
+[tool.mypy]
+strict = true
+exclude = "(\\.venv|\\.git|build|dist|\\.mypy_cache|\\.ruff_cache)"
+
+ignore_missing_imports = true
+warn_unreachable = true
+no_implicit_optional = true
+check_untyped_defs = false
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+disable_error_code = ["var-annotated", "type-arg"]
+show_error_codes = true
+show_error_context = true
+pretty = true
