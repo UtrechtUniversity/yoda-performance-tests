@@ -6,7 +6,7 @@ import tempfile
 
 import irods.keywords as kw
 from irods.session import iRODSSession
-from locust import User, constant, events, task
+from locust import constant, events, task, User
 
 
 def create_temp_binary_file(size_mb):

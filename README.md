@@ -22,7 +22,13 @@ This project provides tools for performing performance tests for [Yoda](https://
    uv lock
    uv sync
    ```
-   If you want to develop on these tools, also install the dev extras
+
+   If you want to develop on these tools, also install the dev extras:
+   ```bash
+   pip install .[dev]
+   ```
+
+   Or if you prefer `uv`:
    ```bash
    uv sync --extra dev
    ```

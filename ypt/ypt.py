@@ -10,7 +10,7 @@ import logging
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import as_completed, ThreadPoolExecutor
 
 import matplotlib.pyplot as plt
 import numpy as np

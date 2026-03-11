@@ -71,12 +71,13 @@ select = ["E", "W", "F", "C90", "FURB", "N", "UP", "YTT", "PLE", "FURB", "SIM", 
 ignore = ["T201"]
 
 [tool.flake8]
-ignore = ["E402"]
+ignore = ["E402", "DAR"]
 import-order-style = "smarkets"
 strictness = "short"
 docstring_style = "sphinx"
 max-line-length = 127
 exclude = ["venv", "build"]
+application-import-names=["lf_irods"]
 
 [tool.mypy]
 strict = true
