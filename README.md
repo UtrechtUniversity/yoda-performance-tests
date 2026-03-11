@@ -16,7 +16,7 @@ This project provides tools for performing performance tests for [Yoda](https://
    ```bash
    pip install .
    ```
-   
+
    Or if you prefer `uv`:
    ```bash
    uv lock
@@ -32,14 +32,14 @@ This project provides tools for performing performance tests for [Yoda](https://
 You can run tests using locust (omit `uv run` if you installed with pip):
 
 ```bash
-uv run locust -f lf_init.py,lf_irods.py --environment "environment.json"
+uv run locust -f lf_init.py,lf_irods.py --environment environments/development.json
 ```
-This will run all Tests (tasks contained in classes derived from locust.User) as tests indefinitely. In this 
+This will run all Tests (tasks contained in classes derived from locust.User) as tests indefinitely. In this
 the iRODS tests.
 
 There is also the possibility to run a couple of tests after each other in more **staged** fashion:
 ```bash
-uv run locust -f lf_init.py,lf_irods.py,lf_stages.py --environment "environment.json"
+uv run locust -f lf_init.py,lf_irods.py,lf_stages.py --environment environments/development.json
 ```
 
 ## Roadmap
