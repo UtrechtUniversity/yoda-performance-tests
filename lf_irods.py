@@ -9,7 +9,7 @@ from irods.session import iRODSSession
 from locust import constant, events, task, User
 
 
-def create_temp_binary_file(size_mb):
+def create_temp_binary_file(size_mb: int) -> str:
     # Calculate the size in bytes
     size_bytes = size_mb * 1024 * 1024
     # Create a temporary file
@@ -29,7 +29,7 @@ class IrodsBaseUser(User):
 
 class IrodsUploadUser(IrodsBaseUser):
 
-    def on_start(self):
+    def on_start(self) -> None:
         env_config = self.environment.parsed_options.environment
         self.irods = iRODSSession(
             host=env_config['irods']['host'],
@@ -45,7 +45,7 @@ class IrodsUploadUser(IrodsBaseUser):
         self.remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(self.temp_file_path)}"
         print(f"Temporary file for upload user created: {self.temp_file_path}")
 
-    def on_stop(self):
+    def on_stop(self) -> None:
         try:
             self.irods.data_objects.unlink(self.remote_file_path, **{kw.FORCE_FLAG_KW: True})
             print(f"Uploaded file for upload user removed: {self.remote_file_path}")
@@ -55,7 +55,7 @@ class IrodsUploadUser(IrodsBaseUser):
             pass
 
     @task(1)
-    def upload_file(self):
+    def upload_file(self) -> None:
         request_type = "python-irods"
         request_name = "put file"
         with events.request.measure(request_type, request_name):
@@ -63,7 +63,7 @@ class IrodsUploadUser(IrodsBaseUser):
 
 
 class IrodsDownloadUser(IrodsBaseUser):
-    def on_start(self):
+    def on_start(self) -> None:
         env_config = self.environment.parsed_options.environment
         self.irods = iRODSSession(
             host=env_config['irods']['host'],
@@ -83,17 +83,16 @@ class IrodsDownloadUser(IrodsBaseUser):
         self.irods.data_objects.put(self.temp_file_path, self.remote_file_path, **{kw.FORCE_FLAG_KW: True})
         print(f"Temporary file for download user uploaded to yoda: {self.remote_file_path}")
 
-    def on_stop(self):
+    def on_stop(self) -> None:
         try:
             # Remove the uploaded file again:
             self.irods.data_objects.unlink(self.remote_file_path, **{kw.FORCE_FLAG_KW: ""})
             self.irods.cleanup()
-
         except Exception:
             pass
 
     @task(1)
-    def download_file(self):
+    def download_file(self) -> None:
         request_type = "python-irods"
         request_name = "get file"
         with events.request.measure(request_type, request_name):

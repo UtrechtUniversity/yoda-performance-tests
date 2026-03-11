@@ -4,11 +4,12 @@ __license__ = 'GPLv3, see LICENSE'
 import argparse
 import json
 import pathlib
+from typing import Any
 
 from locust import events
 
 
-def json_dict(path: str) -> dict:
+def json_dict(path: str) -> Any:
     """
     Argparse “type” that reads *path*, parses it as JSON and returns a dict.
 
@@ -27,7 +28,7 @@ def json_dict(path: str) -> dict:
 
 
 @events.init_command_line_parser.add_listener
-def _(parser):
+def _(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--environment",
         type=json_dict,
@@ -45,6 +46,6 @@ def _(parser):
 
 
 @events.test_start.add_listener
-def _(environment, **kw):
+def _(environment: Any, **kw: str) -> None:
     print(f"Custom argument supplied - environment: {environment.parsed_options.environment}")
     print(f"Custom argument supplied - user-credentials: {environment.parsed_options.user_credentials}")

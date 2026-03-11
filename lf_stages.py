@@ -39,12 +39,12 @@ class IrodsStages(LoadTestShape):
         },
     ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: int, **kwargs: str) -> None:
         self.stage_number = 0
         self.stopping_stage = False
         super().__init__(*args, **kwargs)
 
-    def tick(self):
+    def tick(self) -> tuple | None:
         try:
             stage = self.stages[self.stage_number]
         except IndexError:
@@ -84,3 +84,5 @@ class IrodsStages(LoadTestShape):
             # Return this tick_data anyway, to make sure that the runner is not stopped pre-maturely.
             # (Since a return None, stops the runner completely)
             return (0, 100)
+
+        return None
