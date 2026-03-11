@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
+__license__ = 'GPLv3, see LICENSE'
+
 import os
 import tempfile
 
-from locust import User, task, events, constant
-from irods.session import iRODSSession
 import irods.keywords as kw
+from irods.session import iRODSSession
+from locust import User, constant, events, task
 
 
 def create_temp_binary_file(size_mb):
@@ -55,12 +58,11 @@ class IrodsUploadUser(IrodsBaseUser):
     def upload_file(self):
         request_type = "python-irods"
         request_name = "put file"
-        with events.request.measure(request_type, request_name) as request:
+        with events.request.measure(request_type, request_name):
             self.irods.data_objects.put(self.temp_file_path, self.remote_file_path, **{kw.FORCE_FLAG_KW: True})
 
 
 class IrodsDownloadUser(IrodsBaseUser):
-
     def on_start(self):
         env_config = self.environment.parsed_options.environment
         self.irods = iRODSSession(
@@ -72,15 +74,7 @@ class IrodsDownloadUser(IrodsBaseUser):
             configure=True,
             **env_config['irods']['session-options']
         )
-        #self.irods = iRODSSession(
-        #    host='localhost',
-        #    port=8247,
-        #    user='researcher',
-        #    password='test',
-        #    zone='tempZone',
-        #    configure=True,
-        #    **IRODS_SESSION_OPTIONS
-        #)
+
         # create a file to download
         self.temp_file_path = create_temp_binary_file(1)
         self.remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(self.temp_file_path)}"
@@ -88,7 +82,6 @@ class IrodsDownloadUser(IrodsBaseUser):
 
         self.irods.data_objects.put(self.temp_file_path, self.remote_file_path, **{kw.FORCE_FLAG_KW: True})
         print(f"Temporary file for download user uploaded to yoda: {self.remote_file_path}")
-
 
     def on_stop(self):
         try:
@@ -105,4 +98,3 @@ class IrodsDownloadUser(IrodsBaseUser):
         request_name = "get file"
         with events.request.measure(request_type, request_name):
             self.irods.data_objects.get(self.remote_file_path, 'local_copy.bin', **{kw.FORCE_FLAG_KW: ""})
-

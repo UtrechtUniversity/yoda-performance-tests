@@ -1,21 +1,25 @@
+#!/usr/bin/env python3
+__license__ = 'GPLv3, see LICENSE'
 import time
-from locust import LoadTestShape, TaskSet, constant, task
 
-from lf_irods import IrodsUploadUser, IrodsDownloadUser
+from locust import LoadTestShape
+
+from lf_irods import IrodsDownloadUser, IrodsUploadUser
 
 
 class IrodsStages(LoadTestShape):
     """
     iRODS test stages: you can specify different users, with different spawn rates and runtimes.
 
-    Keyword arguments:
-
+    Keyword Arguments:
+    -----------------
         stages -- A list of dicts, each representing a stage with the following keys:
             name -- The name of the stage
             duration -- When this many seconds pass the test is advanced to the next stage
             users -- Total user count
             spawn_rate -- Number of users to start/stop per second
             stop -- A boolean that can stop that test at a specific stage
+
     """
 
     stages = [
@@ -47,7 +51,8 @@ class IrodsStages(LoadTestShape):
             print("We are at the end of the stages, stopping...")
             return None
 
-        print(f"[T: {self.get_run_time()}] Running stage: {stage['name']} [{self.stage_number}] | #users: {self.get_current_user_count()}")
+        print(f"[T: {self.get_run_time()}] Running stage: {stage['name']} [{self.stage_number}] |"
+              f"#users: {self.get_current_user_count()}")
         print(f"Current running users: {self.runner.user_classes_count}")
 
         # Check if we can continue with this stage and if there is no active stop signal
@@ -57,7 +62,6 @@ class IrodsStages(LoadTestShape):
             self.stopping_stage = True
             # Return a tick with 0 users and very high rate to keep on signalling a stop to the runner
             return (0, 100)
-
 
         if self.get_run_time() < stage["duration"] and not self.stopping_stage:
             # We can continue with this stage

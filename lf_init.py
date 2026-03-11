@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+__license__ = 'GPLv3, see LICENSE'
+
 import argparse
 import json
 import pathlib
 
-from locust import events, User
+from locust import events
 
 
 def json_dict(path: str) -> dict:
@@ -28,7 +31,7 @@ def _(parser):
     parser.add_argument(
         "--environment",
         type=json_dict,
-        default="environment.json",
+        default="environments/development.json",
         include_in_web_ui=False,
         help="Config file"
     )
@@ -45,4 +48,3 @@ def _(parser):
 def _(environment, **kw):
     print(f"Custom argument supplied - environment: {environment.parsed_options.environment}")
     print(f"Custom argument supplied - user-credentials: {environment.parsed_options.user_credentials}")
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 __copyright__ = 'Copyright (c) 2025, Utrecht University'
-__license__   = 'GPLv3, see LICENSE'
+__license__ = 'GPLv3, see LICENSE'
 
 import argparse
 import datetime
@@ -10,8 +10,7 @@ import logging
 import os
 import re
 import time
-from concurrent.futures import as_completed, ThreadPoolExecutor
-from typing import Dict, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -76,7 +75,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def irods_login(user: Dict[str, str], config: Dict, verbose: bool) -> Optional[iRODSSession]:
+def irods_login(user: dict[str, str], config: dict, verbose: bool) -> iRODSSession | None:
     """Start session with iRODS."""
     try:
         with iRODSSession(
@@ -110,9 +109,9 @@ def irods_logout(session: iRODSSession, verbose: bool) -> None:
             logger.error(f"iRDOS: failed to log out user: {e}")
 
 
-def portal_login(user: Dict[str, str],
-                 config: Dict,
-                 verbose: bool, insecure: bool) -> Optional[Tuple[str, str, str]]:
+def portal_login(user: dict[str, str],
+                 config: dict,
+                 verbose: bool, insecure: bool) -> tuple[str, str, str] | None:
     """Start session with Yoda portal."""
     username = user['username']
     password = user['password']
@@ -169,10 +168,10 @@ def portal_login(user: Dict[str, str],
             return None
 
 
-def api_request(user: Tuple[str, str, str],
-                request: str, data: Dict[str, str],
-                config: Dict,
-                verbose: bool, insecure: bool) -> Tuple[int, Dict[str, str]]:
+def api_request(user: tuple[str, str, str],
+                request: str, data: dict[str, str],
+                config: dict,
+                verbose: bool, insecure: bool) -> tuple[int, dict[str, str]]:
     # Retrieve user cookies.
     username, csrf, session = user
 
@@ -195,8 +194,8 @@ def api_request(user: Tuple[str, str, str],
     return response.status_code, body
 
 
-def get_data_access_password(user: Tuple[str, str, str],
-                             config: Dict,
+def get_data_access_password(user: tuple[str, str, str],
+                             config: dict,
                              verbose: bool, insecure: bool) -> str:
     # Get the current timestamp
     timestamp = datetime.datetime.now()
@@ -208,7 +207,7 @@ def get_data_access_password(user: Tuple[str, str, str],
     return body['data']
 
 
-def webdav_login(user: Dict[str, str], config: Dict, verbose: bool, insecure: bool) -> Optional[Dict[str, str]]:
+def webdav_login(user: dict[str, str], config: dict, verbose: bool, insecure: bool) -> dict[str, str] | None:
     """Start session with WebDAV."""
     try:
         options = {
@@ -230,17 +229,17 @@ def webdav_login(user: Dict[str, str], config: Dict, verbose: bool, insecure: bo
         return None
 
 
-def load_config(file_path: str) -> Dict:
+def load_config(file_path: str) -> dict:
     if not os.path.exists(file_path):
         raise FileNotFoundError
 
-    with open(file_path, 'r') as file:
+    with open(file_path) as file:
         config = json.load(file)
 
     return config
 
 
-def plot_results_graph(results: Dict, concurrent_sessions: int) -> None:
+def plot_results_graph(results: dict, concurrent_sessions: int) -> None:
     # Prepare results for plotting.
     labels = list(results.keys())
 
@@ -290,7 +289,7 @@ def main() -> None:
         logger.error(f"ERROR: Users file not found: {args.users}")
         return None
 
-    def manage_session(action: str, user: Dict[str, str], session_list: List, session_type: str) -> None:
+    def manage_session(action: str, user: dict[str, str], session_list: list, session_type: str) -> None:
         """Manage session login or logout."""
         try:
             if action == 'login':
