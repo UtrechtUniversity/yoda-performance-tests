@@ -35,9 +35,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest==9.0.2",
-    "ruff==0.15.4",
-    "flake8==7.1.1",
-    "flake8-import-order==0.18.2",
+    "ruff==0.15.5",
+    "flake8==7.3.0",
+    "flake8-import-order==0.19.1",
     "flake8-pyproject==1.2.4",
     "darglint==1.8.1",
     "mypy==1.19.1",
