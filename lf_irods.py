@@ -28,7 +28,6 @@ class IrodsBaseUser(User):
 
 
 class IrodsUploadUser(IrodsBaseUser):
-
     def on_start(self) -> None:
         env_config = self.environment.parsed_options.environment
         self.irods = iRODSSession(
