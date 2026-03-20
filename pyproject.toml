@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "python-irodsclient==3.1.1",
+    "python-irodsclient==3.3.0",
     "locust==2.43.3",
     "urllib3==2.6.3",
     "requests==2.32.4",
