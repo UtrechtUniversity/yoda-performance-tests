@@ -3,6 +3,9 @@ __license__ = 'GPLv3, see LICENSE'
 
 import json
 import re
+import tempfile
+import os
+from urllib import response
 
 import urllib3
 from locust import constant, HttpUser, task
@@ -15,8 +18,17 @@ class PortalBaseUser(HttpUser):
     # This class is meant to be subclassed, this is indicated by setting the class variable 'abstract' to True
     abstract = True
     wait_time = constant(1)
-    host = "https://portal.yoda:8443"
+    host = "https://yd06.yodadtap.src.surf-hosted.nl:8443"
 
+def create_temp_binary_file(size_mb: int) -> str:
+    # Calculate the size in bytes
+    size_bytes = size_mb * 1024 * 1024
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        # Write zeros to the file to fill it to the desired size
+        tmp.write(b'\0' * size_bytes)
+        tmp_path = tmp.name
+    return tmp_path
 
 class PortalUser(PortalBaseUser):
     username: str = ""
@@ -99,6 +111,49 @@ class PortalUser(PortalBaseUser):
 
         return response.status_code, body
 
+    def upload_data(self, file, folder,file_content):
+        env_config = self.environment.parsed_options.environment
+        # Disable insecure connection warning.
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        # Make POST request.
+        url = f"{env_config['portal']['fqdn']}/research/upload"
+
+        # filename = os.path.basename(file)
+
+
+        files = {"csrf_token": (None, self.portal_csrf),
+                "filepath": (None, folder),
+                "flowChunkNumber": (None, "1"),
+                "flowChunkSize": (None, "10485760"),
+                "flowCurrentChunkSize": (None,"4"),
+                "flowTotalSize": (None, "4"),
+                "flowIdentifier": (None, "4-{}".format(file)),
+                "flowFilename": (None, file),
+                "flowRelativePath": (None, file),
+                "flowTotalChunks": (None, "1"),
+                "file": (file, file_content)}
+
+        cookies={'__Host-session': self.portal_session_cookie}
+        headers = {'referer': url}
+        response = self.client.post(
+            url,
+            headers=headers,
+            files=files,
+            cookies=cookies,
+            verify=False,
+            timeout=60
+        )
+        # body = response.json()
+
+        print("status:", response.status_code)
+        print("content-type:", response.headers.get("Content-Type"))
+        print("text:", repr(response.text))
+
+        body = ""
+        return (response.status_code, body)
+
+
     @task(1)
     def api_group_data(self) -> None:
         status, body = self.api_request("group_data", {})
@@ -110,3 +165,15 @@ class PortalUser(PortalBaseUser):
     @task(1)
     def api_resource_monthly_category_stats(self) -> None:
         status, body = self.api_request("resource_monthly_category_stats", {})
+
+    @task(1)
+    def api_research_file_upload(self) -> None:
+        temp_file_path = create_temp_binary_file(1)
+        remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(temp_file_path)}"
+        target_folder = "research-default-0"
+
+        filename = os.path.basename(temp_file_path)
+        with open(temp_file_path, "rb") as f:
+            content = f.read()
+
+        status, body = self.upload_data(filename, target_folder, content)
