@@ -25,6 +25,8 @@ class IrodsBaseUser(User):
     abstract = True
     wait_time = constant(1)
     host = "https://portal.yoda:8443"
+    # default file size in MB for temporary files
+    file_size_mb = 1
 
 
 class IrodsUploadUser(IrodsBaseUser):
@@ -40,9 +42,9 @@ class IrodsUploadUser(IrodsBaseUser):
             **env_config['irods']['session-options']
         )
         # create a file to upload
-        self.temp_file_path = create_temp_binary_file(1)
+        self.temp_file_path = create_temp_binary_file(getattr(self, "file_size_mb", 1))
         self.remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(self.temp_file_path)}"
-        print(f"Temporary file for upload user created: {self.temp_file_path}")
+        print(f"Temporary file for upload user created (size = {self.file_size_mb} mb): {self.temp_file_path}")
 
     def on_stop(self) -> None:
         try:
@@ -75,9 +77,9 @@ class IrodsDownloadUser(IrodsBaseUser):
         )
 
         # create a file to download
-        self.temp_file_path = create_temp_binary_file(1)
+        self.temp_file_path = create_temp_binary_file(getattr(self, "file_size_mb", 1))
         self.remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(self.temp_file_path)}"
-        print(f"Temporary file for download user created: {self.temp_file_path}")
+        print(f"Temporary file for download user created (size = {self.file_size_mb} mb): {self.temp_file_path}")
 
         self.irods.data_objects.put(self.temp_file_path, self.remote_file_path, **{kw.FORCE_FLAG_KW: True})
         print(f"Temporary file for download user uploaded to yoda: {self.remote_file_path}")

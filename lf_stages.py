@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 __license__ = 'GPLv3, see LICENSE'
 import time
+import sys
 
 from locust import LoadTestShape
 
@@ -28,7 +29,12 @@ class IrodsStages(LoadTestShape):
             "duration": 20,
             "user_count": 5,
             "spawn_rate": 0.5,
-            "user_classes": [IrodsUploadUser]
+            "user_classes": [IrodsUploadUser],
+            "user_params": {
+                "IrodsUploadUser": {
+                    "file_size_mb": 5
+                }
+            }
         },
         {
             "name": "easy download",
@@ -49,11 +55,22 @@ class IrodsStages(LoadTestShape):
             stage = self.stages[self.stage_number]
         except IndexError:
             print("We are at the end of the stages, stopping...")
+            # Exit if running in headless mode, otherwise allow UI to stay open
             return None
+            #if getattr(self.environment.parsed_options, "headless", False):
+            #    sys.exit(0)
+            #else:
+            #    return None
 
         print(f"[T: {self.get_run_time()}] Running stage: {stage['name']} [{self.stage_number}] |"
               f"#users: {self.get_current_user_count()}")
         print(f"Current running users: {self.runner.user_classes_count}")
+
+        # Apply per‑class parameters if provided
+        for user_cls in stage.get("user_classes", []):
+            params = stage.get("user_params", {}).get(user_cls.__name__, {})
+            for key, value in params.items():
+                setattr(user_cls, key, value)
 
         # Check if we can continue with this stage and if there is no active stop signal
         if self.get_run_time() > stage['duration'] and not self.stopping_stage:
