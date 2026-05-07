@@ -1,6 +1,6 @@
 {
     "irods": {
-        "host": "localhost",
+        "host": "yd06.yodadtap.src.surf-hosted.nl",
         "port": 8247,
         "zone": "tempZone",
         "session-options": {
@@ -16,9 +16,9 @@
         }
     },
     "portal": {
-        "fqdn": "https://portal.yoda:8443"
+        "fqdn": "https://yd06.yodadtap.src.surf-hosted.nl:8443"
     },
     "webdav": {
-        "fqdn": "https://data.yoda:8445"
+        "fqdn": "https://yd06.yodadtap.src.surf-hosted.nl:8445"
     }
 }

@@ -42,8 +42,8 @@ class PortalUser(PortalBaseUser):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         url = f"{env_config['portal']['fqdn']}/user/login"
-        self.username = "researcher"
-        password = "test"
+        self.username = os.getenv("test_username")
+        password = os.getenv("test_password")
 
         try:
             # Retrieve the login CSRF token.

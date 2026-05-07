@@ -25,3 +25,6 @@ __pycache__/
 
 # Ruff stuff:
 .ruff_cache/
+
+reports/
+.DS_Store
