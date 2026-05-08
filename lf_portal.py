@@ -8,7 +8,7 @@ import os
 from urllib import response
 
 import urllib3
-from locust import constant, HttpUser, task
+from locust import constant, HttpUser, task, tag
 
 # Precompiled regex patterns
 CSRF_TOKEN_PATTERN = re.compile(r"tokenValue: '([a-zA-Z0-9._-]*)'")
@@ -166,14 +166,14 @@ class PortalUser(PortalBaseUser):
     def api_resource_monthly_category_stats(self) -> None:
         status, body = self.api_request("resource_monthly_category_stats", {})
 
+    @tag("upload")
     @task(1)
     def api_research_file_upload(self) -> None:
         env_config = self.environment.parsed_options.environment
         temp_file_path = create_temp_binary_file(1)
 
-        remote_file_path = f"{env_config['irods']['test_workdir']}/{os.path.basename(temp_file_path)}"
-        target_folder = "research-default-0"
-
+        #target_folder = "research-default-0"
+        target_folder = env_config['irods']['test_workdir']
         filename = os.path.basename(temp_file_path)
         with open(temp_file_path, "rb") as f:
             content = f.read()

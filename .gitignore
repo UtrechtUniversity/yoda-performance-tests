@@ -12,6 +12,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+environments/*.json
 
 # mypy
 .mypy_cache/
