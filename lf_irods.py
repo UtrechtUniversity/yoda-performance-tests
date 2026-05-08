@@ -67,15 +67,15 @@ class IrodsDownloadUser(IrodsBaseUser):
         self.irods = iRODSSession(
             host=env_config['irods']['host'],
             port=env_config['irods']['port'],
-            user= self.environment.parsed_options.username,
-            password= self.environment.parsed_options.password,
+            user=os.getenv("test_username"),
+            password=os.getenv("test_password"),
             zone=env_config['irods']['zone'],
             configure=True,
             **env_config['irods']['session-options']
         )
         # create a file to download
         self.temp_file_path = create_temp_binary_file(1)
-        self.remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(self.temp_file_path)}"
+        self.remote_file_path = f"{env_config['irods']['test_workdir']}/{os.path.basename(self.temp_file_path)}"
         print(f"Temporary file for download user created: {self.temp_file_path}")
 
         self.irods.data_objects.put(self.temp_file_path, self.remote_file_path, **{kw.FORCE_FLAG_KW: True})

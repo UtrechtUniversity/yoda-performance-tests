@@ -168,8 +168,10 @@ class PortalUser(PortalBaseUser):
 
     @task(1)
     def api_research_file_upload(self) -> None:
+        env_config = self.environment.parsed_options.environment
         temp_file_path = create_temp_binary_file(1)
-        remote_file_path = f"/tempZone/home/research-default-0/{os.path.basename(temp_file_path)}"
+
+        remote_file_path = f"{env_config['irods']['test_workdir']}/{os.path.basename(temp_file_path)}"
         target_folder = "research-default-0"
 
         filename = os.path.basename(temp_file_path)

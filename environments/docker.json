@@ -3,6 +3,9 @@
         "host": "yd06.yodadtap.src.surf-hosted.nl",
         "port": 8247,
         "zone": "tempZone",
+        "test_workdir": "/tempZone/home/research-default-0",
+        "username_var": "yd06_test_username",
+        "password_var": "yd06_test_password",
         "session-options": {
             "irods_client_server_policy": "CS_NEG_REQUIRE",
             "irods_client_server_negotiation": "request_server_negotiation",
