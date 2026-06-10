@@ -26,19 +26,19 @@ class IrodsStages(LoadTestShape):
     stages = [
         {
             "name": "easy upload",
-            "duration": 20,
+            "duration": 60,
             "user_count": 5,
             "spawn_rate": 0.5,
             "user_classes": [IrodsUploadUser],
             "user_params": {
                 "IrodsUploadUser": {
-                    "file_size_mb": 5
+                    "file_size_mb": 1
                 }
             }
         },
         {
             "name": "easy download",
-            "duration": 20,
+            "duration": 60,
             "user_count": 5,
             "spawn_rate": 0.5,
             "user_classes": [IrodsDownloadUser]

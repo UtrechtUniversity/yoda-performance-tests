@@ -1,12 +1,9 @@
 {
     "irods": {
-        "host": "yd06.yodadtap.src.surf-hosted.nl",
-        "hostname": "yd06",
+        "host": "localhost",
         "port": 8247,
         "zone": "tempZone",
-        "test_workdir": "research-locusttest2",
-        "username_var": "yd06_test_username",
-        "password_var": "yd06_test_password",
+        "test_workdir": "research-default-0",
         "session-options": {
             "irods_client_server_policy": "CS_NEG_REQUIRE",
             "irods_client_server_negotiation": "request_server_negotiation",
@@ -20,9 +17,9 @@
         }
     },
     "portal": {
-        "fqdn": "https://yd06.yodadtap.src.surf-hosted.nl:8443"
+        "fqdn": "https://portal.yoda:8443"
     },
     "webdav": {
-        "fqdn": "https://yd06.yodadtap.src.surf-hosted.nl:8445"
+        "fqdn": "https://portal.yoda:8445"
     }
 }

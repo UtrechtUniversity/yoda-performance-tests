@@ -18,7 +18,7 @@ class PortalBaseUser(HttpUser):
     # This class is meant to be subclassed, this is indicated by setting the class variable 'abstract' to True
     abstract = True
     wait_time = constant(1)
-    host = "https://yd06.yodadtap.src.surf-hosted.nl:8443"
+    host = "https://surf-yoda.irods.surfsara.nl"
 
 def create_temp_binary_file(size_mb: int) -> str:
     # Calculate the size in bytes
