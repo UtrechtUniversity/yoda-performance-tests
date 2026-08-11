@@ -137,7 +137,7 @@ class PortalUser(PortalBaseUser):
             files=files,
             cookies={'__Host-session': self.portal_session_cookie},
             verify=False,
-            timeout=30,
+            timeout=20,
             catch_response=True
         ) as response:
 
@@ -184,7 +184,7 @@ class PortalUser(PortalBaseUser):
             files=files,
             cookies=cookies,
             verify=False,
-            timeout=30,
+            timeout=20,
             catch_response=True
         ) as response:
             body = response.text
@@ -231,130 +231,3 @@ class PortalUser(PortalBaseUser):
 
         status, body = self.upload_data(filename, target_folder, content)
 
-class BreakingPointShape(LoadTestShape):
-    """
-    Increase the target user count every STEP_DURATION_SECONDS.
-
-    Example:
-
-        0-60 seconds:      5 users
-        60-120 seconds:   10 users
-        120-180 seconds:  15 users
-        ...
-    """
-
-    def tick(self):
-        run_time = self.get_run_time()
-
-        step_number = int(run_time // STEP_DURATION_SECONDS) + 1
-        target_users = step_number * USERS_PER_STEP
-
-        if target_users > MAX_USERS:
-            return None
-
-        return target_users, SPAWN_RATE
-
-
-# ---------------------------------------------------------------------------
-# Stop when the system reaches its breaking point
-# ---------------------------------------------------------------------------
-
-def breaking_point_monitor(environment):
-    consecutive_bad_checks = 0
-    last_completed = 0
-    last_progress_time = time.monotonic()
-    while environment.runner.state not in {
-        STATE_STOPPING,
-        STATE_STOPPED,
-        STATE_CLEANUP,
-    }:
-        gevent.sleep(5)
-
-        stats = environment.runner.stats.total
-        completed = stats.num_requests
-        if completed > last_completed:
-            last_completed = completed
-            last_progress_time = time.monotonic()
-        no_progress_for = time.monotonic() - last_progress_time
-
-        if no_progress_for >= NO_PROGRESS_SECONDS:
-            logging.error(
-                "Stopping: no requests completed for %.1f seconds",
-                no_progress_for,
-            )
-            environment.runner.quit()
-            return
-
-
-        if stats.num_requests < MIN_REQUESTS_BEFORE_CHECK:
-            continue
-
-        p95_ms = stats.get_response_time_percentile(0.95)
-        average_ms = stats.avg_response_time or 0
-        failure_ratio = stats.fail_ratio
-
-        current_users = environment.runner.user_count
-
-        logger.info(
-            "Health check: users=%s requests=%s "
-            "p95=%.0fms average=%.0fms failure_ratio=%.2f%%",
-            current_users,
-            stats.num_requests,
-            p95_ms,
-            average_ms,
-            failure_ratio * 100,
-        )
-
-        reasons = []
-
-        if p95_ms > MAX_P95_MS:
-            reasons.append(
-                f"p95 {p95_ms:.0f} ms > {MAX_P95_MS} ms"
-            )
-
-        if average_ms > MAX_AVERAGE_MS:
-            reasons.append(
-                f"average {average_ms:.0f} ms > "
-                f"{MAX_AVERAGE_MS} ms"
-            )
-
-        if failure_ratio > MAX_FAILURE_RATIO:
-            reasons.append(
-                f"failure ratio {failure_ratio:.2%} > "
-                f"{MAX_FAILURE_RATIO:.2%}"
-            )
-
-        if reasons:
-            consecutive_bad_checks += 1
-
-            logger.warning(
-                "Threshold violation %s/%s at %s users: %s",
-                consecutive_bad_checks,
-                CONSECUTIVE_BAD_CHECKS,
-                current_users,
-                "; ".join(reasons),
-            )
-        else:
-            consecutive_bad_checks = 0
-
-        if consecutive_bad_checks >= CONSECUTIVE_BAD_CHECKS:
-            logger.error(
-                "BREAKING POINT reached at approximately %s users: %s",
-                current_users,
-                "; ".join(reasons),
-            )
-
-            # Non-zero exit code is useful in CI.
-            environment.process_exit_code = 1
-            environment.runner.quit()
-            return
-
-
-@events.init.add_listener
-def start_breaking_point_monitor(environment, **kwargs):
-    """
-    Only monitor aggregate statistics on the local runner or master.
-    Do not start a separate monitor on every distributed worker.
-    """
-    if isinstance(environment.runner, (LocalRunner, MasterRunner)):
-        gevent.spawn(breaking_point_monitor, environment)
