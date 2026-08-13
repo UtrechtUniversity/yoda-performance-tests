@@ -114,7 +114,8 @@ def breaking_point_monitor(environment):
         completed = stats.num_requests
         response_count = completed - last_completed
         last_completed = completed
-        last_progress_time = time.monotonic()
+        if response_count > 0:
+            last_progress_time = time.monotonic()
 
         if response_period >= NO_PROGRESS_SECONDS and response_count == 0:
             logging.error(
@@ -156,6 +157,10 @@ def breaking_point_monitor(environment):
             f"p95={p95_ms:.0f}ms average={average_ms:.0f}ms failure_ratio={failure_ratio * 100:.2f}%"
         )
 
+        # # finish this time
+        # environment.process_exit_code = 1
+        # environment.runner.quit()
+        # return
 
         reasons = []
 
@@ -208,9 +213,12 @@ def start_breaking_point_monitor(environment, **kwargs):
     Only monitor aggregate statistics on the local runner or master.
     Do not start a separate monitor on every distributed worker.
     """
+    print("------------------------------------------------------------------------------------")
+    print(f"Starting breaking point monitor for runner type: {type(environment.runner)}")
     if isinstance(environment.runner, (LocalRunner, MasterRunner)):
         gevent.spawn(breaking_point_monitor, environment)
-
+    else:
+        print("Not starting breaking point monitor on worker node")
 
 
 
@@ -235,3 +243,17 @@ def _(parser: argparse.ArgumentParser) -> None:
 def _(environment: Any, **kw: str) -> None:
     print(f"Custom argument supplied - environment: {environment.parsed_options.environment}")
     print(f"Custom argument supplied - user-credentials: {environment.parsed_options.user_credentials}")
+
+@events.test_stop.add_listener
+def on_test_stop(environment, **kwargs):
+    print("EVENT: test_stop")
+
+
+@events.quitting.add_listener
+def on_quitting(environment, **kwargs):
+    print("EVENT: quitting")
+
+
+@events.quit.add_listener
+def on_quit(exit_code, **kwargs):
+    print("EVENT: quit", exit_code)

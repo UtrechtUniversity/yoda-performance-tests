@@ -68,13 +68,15 @@ class PortalUser(PortalBaseUser):
     username: str = ""
     portal_csrf: str = ""
     portal_session_cookie: str = ""
-
+    download_dir: str = ""
+    download_index: int = 0
+    download_files: list[str] = []
     def on_start(self) -> None:
         env_config = self.environment.parsed_options.environment
 
         # Disable insecure connection warning.
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
+        self.download_dir = env_config['portal']['download_dir']
         url = f"{env_config['portal']['fqdn']}/user/login"
         self.username = os.getenv("test_username")
         password = os.getenv("test_password")
@@ -112,6 +114,26 @@ class PortalUser(PortalBaseUser):
 
             self.portal_csrf = csrf
             self.portal_session_cookie = session_cookie
+            # get list of files in download folder
+            status, body  = self.api_request("browse_folder", {"coll":f"/{env_config['irods']['zone']}/home/{self.download_dir}","offset":0,"limit":200,"sort_order":"asc","sort_on":"name","space":"Space.RESEARCH"})
+            folder_info = json.loads(body)
+            if status != 200:
+                print(f"Portal: could not list files in download folder for user <{self.username}>, response was: {folder_info}")
+
+            elif status == 200:
+                # print(f"Portal: list of files in download folder for user <{self.username}>: {folder_info}")
+                self.download_files = [
+                f"/{self.download_dir}/{item['name']}"
+                for item in folder_info["data"]["items"]
+                if item["type"] == "data"
+                ]
+            else:
+                print(f"Portal: unexpected response code {status} for user <{self.username}>, response was: {body}")
+                return None
+
+
+
+
         except Exception as e:
             print(f"Portal: error during portal login for user <{self.username}>: {e}")
             return None
@@ -204,15 +226,17 @@ class PortalUser(PortalBaseUser):
         body = ""
         return (response.status_code, body)
 
-
+    @tag("High-Cost")
     @task(1)
     def api_group_data(self) -> None:
         status, body = self.api_request("group_data", {})
 
+    @tag("High-Cost")
     @task(1)
     def api_resource_category_stats(self) -> None:
         status, body = self.api_request("resource_category_stats", {})
 
+    @tag("High-Cost")
     @task(1)
     def api_resource_monthly_category_stats(self) -> None:
         status, body = self.api_request("resource_monthly_category_stats", {})
@@ -231,3 +255,45 @@ class PortalUser(PortalBaseUser):
 
         status, body = self.upload_data(filename, target_folder, content)
 
+
+    @tag("download")
+    @task(1)
+    def download(self):
+        if self.download_index >= len(self.download_files): self.download_index = 0
+        filepath = self.download_files[self.download_index]
+        self.download_index = self.download_index + 1
+        start = time.perf_counter()
+        with self.client.get(
+            "/browse/download",
+            params={"filepath": filepath},
+            name="download",
+            stream=True,
+            catch_response=True,
+        ) as response:
+            first_byte_time = None
+            total_bytes = 0
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if first_byte_time is None:
+                    first_byte_time = time.perf_counter()
+
+                total_bytes += len(chunk)
+            status = response.status_code
+            if first_byte_time is not None:
+                ttfb_ms = (first_byte_time - start) * 1000
+                self.environment.events.request.fire(
+                    request_type="TTFB",
+                    name="download",
+                    response_time=ttfb_ms,
+                    response_length=0,
+                    exception=None,
+                    context={},
+                )
+                print(f"TTFB: {ttfb_ms:.2f} ms, Total bytes: {total_bytes}")
+            if status in (200, 201, 202, 204):
+                response.success()
+                print(f"Download successful: HTTP {status}; for {filepath}")
+            else:
+                response.failure(
+                    f"Download failed: {status}"
+                )
+                print(f"Download failed: HTTP {status}; for {filepath}")
