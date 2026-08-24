@@ -19,6 +19,12 @@ from locust.runners import (
     STATE_STOPPED,
     STATE_STOPPING,
 )
+from locust.user.markov_taskset import (
+    MarkovTaskSet,
+    transition,
+    transitions,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +53,6 @@ CONSECUTIVE_BAD_CHECKS = int(
     os.getenv("CONSECUTIVE_BAD_CHECKS", "3")
 )
 
-
-class PortalBaseUser(HttpUser):
-    # This class is meant to be subclassed, this is indicated by setting the class variable 'abstract' to True
-    abstract = True
-    wait_time = constant(1)
-    host = "https://surf-yoda.irods.surfsara.nl"
-
 def create_temp_binary_file(size_mb: int) -> str:
     # Calculate the size in bytes
     size_bytes = size_mb * 1024 * 1024
@@ -64,7 +63,12 @@ def create_temp_binary_file(size_mb: int) -> str:
         tmp_path = tmp.name
     return tmp_path
 
-class PortalUser(PortalBaseUser):
+class YodaPortalUser(HttpUser):
+    # This class is meant to be subclassed, this is indicated by setting the class variable 'abstract' to True
+    abstract = True
+    wait_time = constant(1)
+    host = "https://surf-yoda.irods.surfsara.nl"
+
     username: str = ""
     portal_csrf: str = ""
     portal_session_cookie: str = ""
@@ -92,7 +96,7 @@ class PortalUser(PortalBaseUser):
             csrf = found_csrf_tokens[0]
 
             # Login as user.
-            print(f"Portal: login for user <{self.username}>")
+            print(f"Portal: login for user <{self.username}> of type <{self.__class__.__name__}>")
 
             login_data = {'csrf_token': csrf, 'username': self.username, 'password': password, 'next': '/'}
             response = self.client.post(url, data=login_data, headers={'Referer': url}, verify=False)
@@ -227,22 +231,18 @@ class PortalUser(PortalBaseUser):
         return (response.status_code, body)
 
     @tag("High-Cost")
-    @task(1)
     def api_group_data(self) -> None:
         status, body = self.api_request("group_data", {})
 
     @tag("High-Cost")
-    @task(1)
     def api_resource_category_stats(self) -> None:
         status, body = self.api_request("resource_category_stats", {})
 
     @tag("High-Cost")
-    @task(1)
     def api_resource_monthly_category_stats(self) -> None:
         status, body = self.api_request("resource_monthly_category_stats", {})
 
     @tag("upload")
-    @task(1)
     def api_research_file_upload(self) -> None:
         env_config = self.environment.parsed_options.environment
         temp_file_path = create_temp_binary_file(1)
@@ -255,9 +255,29 @@ class PortalUser(PortalBaseUser):
 
         status, body = self.upload_data(filename, target_folder, content)
 
+    @tag("browse")
+    def browse(self, folder: str = None) -> None:
+        env_config = self.environment.parsed_options.environment
+        if folder is None:
+            folder = f"/{env_config['irods']['zone']}/home/{self.download_dir}"
+            print(f"folder is:{folder}")
+        status, body  = self.api_request("browse_folder", {"coll": folder,"offset":0,"limit":200,"sort_order":"asc","sort_on":"name","space":"Space.RESEARCH"})
+        if status != 200:
+            print(f"Portal: could not list files in download folder for user <{self.username}>, response was: {status}")
+        elif status == 200:
+            # print(f"---------------------------------------------------------------------------------{body}")
+            folder_info = json.loads(body)
+            # print(f"Portal: list of files in download folder for user <{self.username}>: {folder_info}")
+            self.download_files = [
+                f"/{self.download_dir}/{item['name']}"
+                for item in folder_info["data"]["items"]
+                if item["type"] == "data"
+            ]
+        else:
+            print(f"Portal: unexpected response code {status} for user <{self.username}>, response was: {body}")
+            return None
 
     @tag("download")
-    @task(1)
     def download(self):
         if self.download_index >= len(self.download_files): self.download_index = 0
         filepath = self.download_files[self.download_index]
@@ -297,3 +317,91 @@ class PortalUser(PortalBaseUser):
                     f"Download failed: {status}"
                 )
                 print(f"Download failed: HTTP {status}; for {filepath}")
+
+
+# ============================================================
+# RESEARCHER
+# ============================================================
+class ResearcherJourney(MarkovTaskSet):
+
+    @transitions({
+        "browse": 6,
+        "download": 3,
+        "upload": 3,
+    })
+    def browse(self):
+        self.user.browse()
+
+    @transitions({
+        "browse": 6,
+        "download": 3,
+        "upload":3,
+    })
+    def download(self):
+        self.user.download()
+
+
+    @transitions({
+        "browse": 6,
+        "download": 3,
+        "upload": 3,
+    })
+    def upload(self):
+        self.user.api_research_file_upload()
+
+
+class Researcher(YodaPortalUser):
+
+    weight = 20
+    tasks = [ResearcherJourney]
+    wait_time = between(2, 15)
+
+
+# ============================================================
+# MANAGER
+# ============================================================
+
+class ManagerJourney(MarkovTaskSet):
+
+    @transitions({
+        "browse": 5,
+        "group_data": 3,
+        "resource_stats": 2,
+        "monthly_stats": 1
+    })
+    def browse(self):
+        self.user.browse()
+
+    @transitions({
+        "browse": 5,
+        "group_data": 3,
+        "resource_stats": 2,
+        "monthly_stats": 1
+    })
+    def group_data(self):
+        self.user.api_group_data()
+
+    @transitions({
+        "browse": 5,
+        "group_data": 3,
+        "resource_stats": 2,
+        "monthly_stats": 1
+    })
+    def resource_stats(self):
+        self.user.api_resource_category_stats()
+
+    @transitions({
+        "browse": 5,
+        "group_data": 3,
+        "resource_stats": 2,
+        "monthly_stats": 1
+    })
+    def monthly_stats(self):
+        self.user.api_resource_monthly_category_stats()
+
+
+class Manager(YodaPortalUser):
+
+    weight = 1
+    tasks = [ManagerJourney]
+    wait_time = between(3, 20)
